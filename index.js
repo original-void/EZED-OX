@@ -84,7 +84,8 @@ async function startBot() {
         }
     });
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+        if (type!== "notify") return; // only new messages
         const msg = messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
@@ -92,8 +93,17 @@ async function startBot() {
         const sender = msg.key.participant || msg.key.remoteJid;
         const isGroup = from.endsWith("@g.us");
 
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+        // ===== FIXED: Catch all text types =====
+        const messageType = Object.keys(msg.message)[0];
+        const body = msg.message.conversation
+                   || msg.message.extendedTextMessage?.text
+                   || msg.message.imageMessage?.caption
+                   || msg.message.videoMessage?.caption
+                   || "";
+
+        if (!body) return; // ignore stickers, audio, etc with no caption
         if (!body.startsWith(config.PREFIX)) return;
+        // ===== END FIX =====
 
         const args = body.slice(config.PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
